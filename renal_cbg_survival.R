@@ -21,9 +21,8 @@ numberAdmissions <- function(dateplustime1, intervalThresholdDays) {
   return(admissionNumber)
 }
 
-
 simpleSurvivalPlot<-function(inputFrame,endDateUnix,ylimMin) {
-  # inputFrame <- singleRowPerAdmission_lessThan1DayAdmission_firstAdmission
+  # inputFrame <- survival_oneRowPerID
   # endDateUnix <- max(inputFrame$unix_deathDate)
   # sampleDateUnix <- 
   
@@ -49,13 +48,60 @@ simpleSurvivalPlot<-function(inputFrame,endDateUnix,ylimMin) {
   #  SurvivalData$sex<-factor(1*(SurvivalData$sexNumber <1),levels=0:1,labels=c("F","M"))
   
   
-  mfitAge50<-survfit(Surv(timeToDeathInterval, shortDeathEvent) ~ (min_glucose_during_admission < 3), data = SurvivalData)
+  mfitAge50<-survfit(Surv(timeToDeathInterval, shortDeathEvent) ~ (hypoDuringTestRunIn_perID == 1), data = SurvivalData)
   shortPlotTitle <- paste("Mortality, time ",round(shortCensorPeriodStartDay)/DaySeconds," to ",round(max(SurvivalData$timeToDeathInterval))/DaySeconds," days\n n= ",nrow(SurvivalData),", threshold: ",quantile(SurvivalData$hba1cIQRinRange)[3],sep="")
   plot(mfitAge50,mark.time=T,lty=1:6,conf.int=F,col=c("black","red","blue","green","orange","purple"),main=shortPlotTitle,xlim=c(shortCensorPeriodStartDay,round(max(SurvivalData$timeToDeathInterval))),lwd=5,ylim=c(ylimMin,1))
   
   # mfitAge50.coxph<-coxph(Surv(timeToDeathInterval, shortDeathEvent) ~ age_atSampleTime+medianHbA1cInRange+nValsPerIDinRange+(hba1cIQRinRange>=quantile(SurvivalData$hba1cIQRinRange)[3]), data = SurvivalData)
   
-  mfitAge50.coxph<-coxph(Surv(timeToDeathInterval, shortDeathEvent) ~ age_atSampleTime+diabetesDurationYears+medianHbA1cInRange+nValsPerIDinRange+(hba1cIQRinRange>=quantile(SurvivalData$hba1cIQRinRange)[3]), data = SurvivalData)
+  mfitAge50.coxph<-coxph(Surv(timeToDeathInterval, shortDeathEvent) ~ age_starting_RRT+(hypoDuringTestRunIn_perID == 1), data = SurvivalData)
+  pVal <- summary(mfitAge50.coxph)$coef[,5]; HR <- round(exp(coef(mfitAge50.coxph)),2)
+  legendText <- paste("p = ",pVal," | HR = ",HR,sep="")
+  summarySurvfit <- summary(mfitAge50); legendNames <- row.names(summarySurvfit$table)
+  legend("bottomleft",c(legendNames),lty=1:6,col=c("black","red","blue","green","orange","purple"),cex=0.8); legend("topright",legendText,cex=0.6)
+  
+  print(mfitAge50.coxph)
+  
+}
+
+simpleSurvivalPlot_iqr<-function(inputFrame,endDateUnix,ylimMin) {
+  # inputFrame <- survival_oneRowPerID
+  # endDateUnix <- max(inputFrame$unix_deathDate)
+  # sampleDateUnix <- 
+  
+  SurvivalData<-inputFrame
+  
+  DaySeconds<-(60*60*24)
+  shortCensorPeriodStartDay  <- DaySeconds
+  shortCensorPeriodEndDay    <- DaySeconds*10000
+  
+  lastDOD<-endDateUnix
+  SurvivalData$dateOfDischarge<-inputFrame$dateplustime1 + (intervalToDetermineAdmissionDays * (60*60*24))
+  SurvivalData$timeToDeath<-ifelse(SurvivalData$isDead==1,(SurvivalData$unix_deathDate-SurvivalData$dateOfDischarge),0)
+  #		SurvivalData$timeToDeath<-SurvivalData$timeToDeath/DaySeconds
+  SurvivalData$timeToDeathInterval<-ifelse(SurvivalData$isDead==0,(lastDOD-SurvivalData$dateOfDischarge),SurvivalData$timeToDeath)
+  SurvivalData$timeToDeathInterval[is.na(SurvivalData$timeToDeathInterval)]<-0; SurvivalData<-subset(SurvivalData,timeToDeathInterval>0)
+  # SurvivalData$timeToDeathInterval<-SurvivalData$timeToDeathInterval/(60*60*24*365.25)
+  
+  SurvivalData$shortDeathEvent <- SurvivalData$isDead
+  # SurvivalData$shortDeathEvent <- ifelse(SurvivalData$isDead==1 & SurvivalData$timeToDeath>=(shortCensorPeriodStartDay) & SurvivalData$timeToDeath<(shortCensorPeriodEndDay),1,0)	
+  
+  #  SurvivalData$sexDigit<-ifelse(nchar(SurvivalData$charID==9),as.numeric(substr(SurvivalData$charID,8,8)),as.numeric(substr(SurvivalData$charID,9,9)))
+  # SurvivalData$sexNumber<-ifelse(SurvivalData$sexDigit%%2==0,1,0)
+  #  SurvivalData$sex<-factor(1*(SurvivalData$sexNumber <1),levels=0:1,labels=c("F","M"))
+  
+  medianCV <- quantile(SurvivalData$cv_glucose_during_admission, na.rm = T)[3]
+  medianIQR <- quantile(SurvivalData$IQR_glucose_during_admission, na.rm = T)[3]
+  
+
+  
+  mfitAge50<-survfit(Surv(timeToDeathInterval, shortDeathEvent) ~ (IQR_glucose_during_admission > medianIQR), data = SurvivalData)
+  shortPlotTitle <- paste("Mortality, time ",round(shortCensorPeriodStartDay)/DaySeconds," to ",round(max(SurvivalData$timeToDeathInterval))/DaySeconds," days\n n= ",nrow(SurvivalData),", threshold: ",quantile(SurvivalData$hba1cIQRinRange)[3],sep="")
+  plot(mfitAge50,mark.time=T,lty=1:6,conf.int=F,col=c("black","red","blue","green","orange","purple"),main=shortPlotTitle,xlim=c(shortCensorPeriodStartDay,round(max(SurvivalData$timeToDeathInterval))),lwd=5,ylim=c(ylimMin,1))
+  
+  # mfitAge50.coxph<-coxph(Surv(timeToDeathInterval, shortDeathEvent) ~ age_atSampleTime+medianHbA1cInRange+nValsPerIDinRange+(hba1cIQRinRange>=quantile(SurvivalData$hba1cIQRinRange)[3]), data = SurvivalData)
+  
+  mfitAge50.coxph<-coxph(Surv(timeToDeathInterval, shortDeathEvent) ~ age_starting_RRT+median_glucose_during_admission+(IQR_glucose_during_admission > medianIQR), data = SurvivalData)
   pVal <- summary(mfitAge50.coxph)$coef[,5]; HR <- round(exp(coef(mfitAge50.coxph)),2)
   legendText <- paste("p = ",pVal," | HR = ",HR,sep="")
   summarySurvfit <- summary(mfitAge50); legendNames <- row.names(summarySurvfit$table)
@@ -70,7 +116,7 @@ renalDataset = read.csv("~/R/_workingDirectory/renal_cbg/GlycaemiaBaselineData.c
 cbgDataset = read.csv('~/R/GlCoSy/source/CHIsetCombined_CORE_allAdult_09-16.csv')
 
 # set admission defining gap
-intervalToDetermineAdmissionDays <- 1.2
+intervalToDetermineAdmissionDays <- 2
 
 renalDatasetDT <- data.table(renalDataset)
   renalDatasetDT <- unique(renalDatasetDT)
@@ -100,12 +146,13 @@ renal_cbgMergeDT$cv_glucose_during_admission <- renal_cbgMergeDT$sd_glucose_duri
 
 # generate one row per admission dataset
 singleRowPerAdmission <- renal_cbgMergeDT[cbg_in_sequence_duringAdmission == 1]
+singleRowPerAdmission <- singleRowPerAdmission[order(singleRowPerAdmission$CHI, singleRowPerAdmission$admissionNumber)]
 
 # remove admissions before dialysis started
 singleRowPerAdmission <- singleRowPerAdmission[dateplustime1 > unix_dateStartingRRT]
 
 # Q ? how long does a dialysis admission last
-singleRowPerAdmission_dialysisAdmission <- singleRowPerAdmission[admissionDurationDays < 1]
+singleRowPerAdmission_dialysisAdmission <- singleRowPerAdmission# [admissionDurationDays < 1]
 
 ########## survival analysis
 # flag first admission
@@ -114,22 +161,80 @@ singleRowPerAdmission_dialysisAdmission <- singleRowPerAdmission[admissionDurati
 # singleRowPerAdmission_lessThan1DayAdmission_firstAdmission <- singleRowPerAdmission_lessThan1DayAdmission[flag_first_admission == 1]
 
 # flag first n admissions, for those with at least n admissions
-n = 2
-singleRowPerAdmission_dialysisAdmission[, c('flag_first_n_admissions') := ifelse(admissionNumber <= n, 1, 0) , by=.(CHI)]
-singleRowPerAdmission_dialysisAdmission[, c('indicate_at_least_n_admission') := ifelse(max(admissionNumber) >= n, 1, 0) , by=.(CHI)]
+n = 1
+hypoThresh = 4
+
+singleRowPerAdmission_dialysisAdmission[, c('dialysis_admissionNumber') := seq(1, .N, 1) , by=.(CHI)]
+
+singleRowPerAdmission_dialysisAdmission[, c('flag_first_n_admissions') := ifelse(dialysis_admissionNumber <= n, 1, 0) , by=.(CHI)]
 singleRowPerAdmission_dialysisAdmission[, c('total_N_admissions') := max(admissionNumber), by = .(CHI)]
 
 # histogram of numbers of dialysis admissions
 hist(singleRowPerAdmission_dialysisAdmission[admissionNumber == 1]$total_N_admissions, breaks = seq(1, 1000, 1), xlim = c(0, 10))
 
 # subset of first n admissions for those with at least n admissions
-singleRowPerAdmission_dialysisAdmission_n_admissionData <- singleRowPerAdmission_dialysisAdmission[indicate_at_least_n_admission == 1]
+# singleRowPerAdmission_dialysisAdmission_n_admissionData <- singleRowPerAdmission_dialysisAdmission[total_N_admissions >= n]
 
-uniqueN(singleRowPerAdmission_dialysisAdmission_n_admissionData$CHI)
+# number of IDs in dataset
+# uniqueN(singleRowPerAdmission_dialysisAdmission_n_admissionData$CHI)
+
+# test group - at least n admissions. one admission per row
+testGroup <- singleRowPerAdmission_dialysisAdmission[total_N_admissions >= n]
+testGroup$age_starting_RRT <- testGroup$unix_dateStartingRRT - testGroup$dob.as.num
+
+# ? hypo during each of the first n admissions
+testGroup[, c('hypoDuringTestRunIn_perAdmission') := ifelse(flag_first_n_admissions == 1 & min_glucose_during_admission < hypoThresh, 1, 0), by = .(CHI)]
+
+testGroup[, c('min_duringFirst_n_admissions') := ifelse(flag_first_n_admissions == 1 & min_glucose_during_admission < hypoThresh, 1, 0), by = .(CHI)]
 
 
-# flag if any hypos in first 10 admissions
-singleRowPerAdmission_dialysisAdmission_n_admissionData[, c('flag_if_hypo_in_n_admissions') := ifelse(min(min_glucose_during_admission) < 4, 1, 0) , by=.(CHI)]
+# flag for survival ? any hypo during any of the first n admissions
+testGroup[, c('hypoDuringTestRunIn_perID') := ifelse( max(hypoDuringTestRunIn_perAdmission) == 1, 1, 0), by = .(CHI)]
+
+
+
+# one row per ID for survival Plot
+survival_oneRowPerID <- testGroup[dialysis_admissionNumber == 1]
+
+dim(survival_oneRowPerID)
+sum(survival_oneRowPerID$hypoDuringTestRunIn_perID)
+
+  summary(survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 1]$age_starting_RRT / (60*60*24*365.25))
+  summary(survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 0]$age_starting_RRT / (60*60*24*365.25))
+  wilcox.test(survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 0]$age_starting_RRT, survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 1]$age_starting_RRT)
+  
+  summary(survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 1]$admissionDurationDays)
+  summary(survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 0]$admissionDurationDays)
+  wilcox.test(survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 1]$admissionDurationDays, survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 0]$admissionDurationDays)
+  
+  summary(survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 1]$n_cbg_duringAdmission)
+  summary(survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 0]$n_cbg_duringAdmission)
+  wilcox.test(survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 1]$n_cbg_duringAdmission, survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 0]$n_cbg_duringAdmission)
+  
+  summary(survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 1]$median_glucose_during_admission)
+  summary(survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 0]$median_glucose_during_admission)
+  wilcox.test(survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 1]$median_glucose_during_admission, survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 0]$median_glucose_during_admission)
+  
+  summary(survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 1]$max_glucose_during_admission)
+  summary(survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 0]$max_glucose_during_admission)
+  wilcox.test(survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 1]$max_glucose_during_admission, survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 0]$max_glucose_during_admission)
+  
+  summary(survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 1]$min_glucose_during_admission)
+  summary(survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 0]$min_glucose_during_admission)
+  wilcox.test(survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 1]$min_glucose_during_admission, survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 0]$min_glucose_during_admission)
+  
+  summary(survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 1]$cv_glucose_during_admission)
+  summary(survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 0]$cv_glucose_during_admission)
+  wilcox.test(survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 1]$cv_glucose_during_admission, survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 0]$cv_glucose_during_admission)
+
+simpleSurvivalPlot(survival_oneRowPerID, max(survival_oneRowPerID$unix_deathDate), 0)
+simpleSurvivalPlot(survival_oneRowPerID[n_cbg_duringAdmission > 1], max(survival_oneRowPerID[n_cbg_duringAdmission > 1]$unix_deathDate), 0)
+
+
+simpleSurvivalPlot_iqr(survival_oneRowPerID[n_cbg_duringAdmission > 1], max(survival_oneRowPerID[n_cbg_duringAdmission > 1]$unix_deathDate), 0)
+simpleSurvivalPlot_iqr(survival_oneRowPerID, max(survival_oneRowPerID$unix_deathDate), 0)
+
+
 
 
 
