@@ -112,7 +112,7 @@ simpleSurvivalPlot_iqr<-function(inputFrame,endDateUnix,ylimMin) {
 }
 
 # Importing the dataset
-renalDataset = read.csv("~/R/_workingDirectory/renal_cbg/GlycaemiaBaselineData.csv")
+renalDataset = read.csv("~/R/_workingDirectory/renal_cbg/GlycaemiaBaselineData.csv") 
 cbgDataset = read.csv('~/R/GlCoSy/source/CHIsetCombined_CORE_allAdult_09-16.csv')
 
 # set admission defining gap
