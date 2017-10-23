@@ -199,6 +199,12 @@ survival_oneRowPerID <- testGroup[dialysis_admissionNumber == 1]
 dim(survival_oneRowPerID)
 sum(survival_oneRowPerID$hypoDuringTestRunIn_perID)
 
+## limit to type of dialysis if needed:
+# survival_oneRowPerID <- survival_oneRowPerID[X1st.RRT.Method == 'Hospital HD']
+# survival_oneRowPerID <- survival_oneRowPerID[X1st.RRT.Method == 'Transplant']
+# survival_oneRowPerID <- survival_oneRowPerID[X1st.RRT.Method == 'CAPD' | X1st.RRT.Method == 'APD']
+
+
   summary(survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 1]$age_starting_RRT / (60*60*24*365.25))
   summary(survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 0]$age_starting_RRT / (60*60*24*365.25))
   wilcox.test(survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 0]$age_starting_RRT, survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 1]$age_starting_RRT)
