@@ -115,6 +115,12 @@ simpleSurvivalPlot_iqr<-function(inputFrame,endDateUnix,ylimMin) {
 renalDataset = read.csv("~/R/_workingDirectory/renal_cbg/GlycaemiaBaselineData.csv") 
 cbgDataset = read.csv('~/R/GlCoSy/source/CHIsetCombined_CORE_allAdult_09-16.csv')
 
+# load diabetesID dataset
+diagnosisSetDF<-read.csv("~/R/GlCoSy/SD_workingSource/diagnosisSetDT.csv")
+# diagnosisSetDF<-subset(diagnosisSetDF,diagnosisDateUnix>returnUnixDateTime("1900-01-01"))
+# diagnosisSetDF<-subset(diagnosisSetDF,birthDateUnix>returnUnixDateTime("1900-01-01"))
+limitedDeathSetDF<-data.frame(diagnosisSetDF$PatId,diagnosisSetDF$DeathDateUnix); colnames(limitedDeathSetDF)<-c("PatId","DeathDateUnix")
+
 # set admission defining gap
 intervalToDetermineAdmissionDays <- 2
 
@@ -203,6 +209,16 @@ sum(survival_oneRowPerID$hypoDuringTestRunIn_perID)
 # survival_oneRowPerID <- survival_oneRowPerID[X1st.RRT.Method == 'Hospital HD']
 # survival_oneRowPerID <- survival_oneRowPerID[X1st.RRT.Method == 'Transplant']
 # survival_oneRowPerID <- survival_oneRowPerID[X1st.RRT.Method == 'CAPD' | X1st.RRT.Method == 'APD']
+
+## limit to DM only
+limitedDeathSetDF$onSCIDM = 1
+survival_oneRowPerID <- merge(survival_oneRowPerID, limitedDeathSetDF, by.x = 'CHI', by.y = 'PatId', all.x = TRUE)
+survival_oneRowPerID$onSCIDM[is.na(survival_oneRowPerID$onSCIDM)] <- 0
+
+# has DM
+# survival_oneRowPerID <- survival_oneRowPerID[onSCIDM == 1]
+# no DM
+# survival_oneRowPerID <- survival_oneRowPerID[onSCIDM == 0]
 
 
   summary(survival_oneRowPerID[n_cbg_duringAdmission > 1 & hypoDuringTestRunIn_perID == 1]$age_starting_RRT / (60*60*24*365.25))
