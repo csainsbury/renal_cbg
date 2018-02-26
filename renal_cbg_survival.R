@@ -123,6 +123,7 @@ limitedDeathSetDF<-data.frame(diagnosisSetDF$PatId,diagnosisSetDF$DeathDateUnix)
 
 # set admission defining gap
 intervalToDetermineAdmissionDays <- 2
+# 44 hours (1.8) as threshold for dialysis episodes, or 2 days per week of dialysis
 
 renalDatasetDT <- data.table(renalDataset)
   renalDatasetDT <- unique(renalDatasetDT)
@@ -252,9 +253,8 @@ survival_oneRowPerID$onSCIDM[is.na(survival_oneRowPerID$onSCIDM)] <- 0
 simpleSurvivalPlot(survival_oneRowPerID, max(survival_oneRowPerID$unix_deathDate), 0)
 simpleSurvivalPlot(survival_oneRowPerID[n_cbg_duringAdmission > 1], max(survival_oneRowPerID[n_cbg_duringAdmission > 1]$unix_deathDate), 0)
 
-
-simpleSurvivalPlot_iqr(survival_oneRowPerID[n_cbg_duringAdmission > 1], max(survival_oneRowPerID[n_cbg_duringAdmission > 1]$unix_deathDate), 0)
 simpleSurvivalPlot_iqr(survival_oneRowPerID, max(survival_oneRowPerID$unix_deathDate), 0)
+simpleSurvivalPlot_iqr(survival_oneRowPerID[n_cbg_duringAdmission > 1], max(survival_oneRowPerID[n_cbg_duringAdmission > 1]$unix_deathDate), 0)
 
 
 
